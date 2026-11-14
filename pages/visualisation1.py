@@ -11,6 +11,7 @@ st.set_page_config(
 
 st.title("📊 Malaysia Marriage Rates, Household Income & CPI Analysis (2018–2024)")
 st.markdown("Data Source: **Department of Statistics Malaysia (DOSM)**")
+st.info("Objective 1: To examine the trends in marriage rates, household income, and consumer prices over the years.")
 
 # 1. Load and process data (cached for faster performance)
 @st.cache_data
