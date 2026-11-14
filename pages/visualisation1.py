@@ -3,16 +3,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Konfigurasi halaman Streamlit
+# Streamlit page configuration
 st.set_page_config(
-    page_title="Dashboard Perkahwinan, Pendapatan & CPI Malaysia",
+    page_title="Malaysia Marriage, Household Income & CPI Dashboard",
     layout="wide"
 )
 
-st.title("📊 Analisis Kadar Perkahwinan, Pendapatan Isi Rumah & CPI (2018–2024)")
-st.markdown("Sumber data: **Jabatan Perangkaan Malaysia (DOSM)**")
+st.title("📊 Malaysia Marriage Rates, Household Income & CPI Analysis (2018–2024)")
+st.markdown("Data Source: **Department of Statistics Malaysia (DOSM)**")
 
-# 1. Muat turun dan proses data (guna cache supaya app laju)
+# 1. Load and process data (cached for faster performance)
 @st.cache_data
 def load_and_process_data():
     url_mar = 'https://storage.dosm.gov.my/demography/marriages_state.parquet'
@@ -27,7 +27,7 @@ def load_and_process_data():
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'])
 
-    # Tapis tahun 2018 hingga 2024
+    # Filter records from 2018 to 2024 inclusive
     start_date = '2018-01-01'
     end_date = '2024-12-31'
 
@@ -35,16 +35,16 @@ def load_and_process_data():
     df_income_filtered = df_income[(df_income['date'] >= start_date) & (df_income['date'] <= end_date)].copy()
     df_cpi_filtered = df_cpi[(df_cpi['date'] >= start_date) & (df_cpi['date'] <= end_date)].copy()
 
-    # Seragamkan tahun
+    # Standardize year column
     df_mar_filtered['year'] = df_mar_filtered['date'].dt.year
     df_income_filtered['year'] = df_income_filtered['date'].dt.year
 
-    # Proses CPI (ambil kategori 'overall' dan purata tahunan)
+    # Process CPI data (filter 'overall' division and compute annual mean)
     df_cpi_overall = df_cpi_filtered[df_cpi_filtered['division'] == 'overall'].copy()
     df_cpi_overall['year'] = df_cpi_overall['date'].dt.year
     df_cpi_annual = df_cpi_overall.groupby(['state', 'year'])['index'].mean().reset_index()
 
-    # Pivot data perkahwinan mengikut jantina
+    # Pivot marriage data by sex to ensure state-year uniqueness
     df_mar_pivot = df_mar_filtered.pivot_table(
         index=['state', 'year'],
         columns='sex',
@@ -56,7 +56,7 @@ def load_and_process_data():
         for col in df_mar_pivot.columns
     ]
 
-    # Gabungkan ketiga-tiga dataset
+    # Merge the three datasets
     df_merged = pd.merge(
         df_mar_pivot,
         df_income_filtered.drop(columns=['date']),
@@ -70,88 +70,88 @@ def load_and_process_data():
 
     return df_merged
 
-# Muatkan data dengan spinner
-with st.spinner("Memuat turun dan memproses data dari DOSM..."):
+# Load data with a loading spinner
+with st.spinner("Fetching and processing data from DOSM..."):
     df_merged = load_and_process_data()
 
-# --- SIDEBAR: PENAPIS NEGERI ---
-st.sidebar.header("Penapis Data")
-senarai_negeri = sorted(df_merged['state'].dropna().unique().tolist())
-pilihan_negeri = st.sidebar.multiselect(
-    "Pilih Negeri (Kosongkan untuk semua negeri):",
-    options=senarai_negeri,
+# --- SIDEBAR: STATE FILTER ---
+st.sidebar.header("Data Filters")
+state_list = sorted(df_merged['state'].dropna().unique().tolist())
+selected_states = st.sidebar.multiselect(
+    "Select State(s) (Leave empty for all states):",
+    options=state_list,
     default=[]
 )
 
-if pilihan_negeri:
-    df_view = df_merged[df_merged['state'].isin(pilihan_negeri)]
+if selected_states:
+    df_view = df_merged[df_merged['state'].isin(selected_states)]
 else:
     df_view = df_merged.copy()
 
-# --- BAHAGIAN 1: METRIK UTAMA (st.metric) ---
-st.subheader("Ringkasan Metrik Utama")
+# --- SECTION 1: KEY METRICS (st.metric) ---
+st.subheader("Key Summary Metrics")
 
 df_2024 = df_view[df_view['year'] == 2024]
 
-# Kadar Perkahwinan
+# Marriage Rates
 latest_marriage_female = df_2024['rate_female'].mean()
 latest_marriage_male = df_2024['rate_male'].mean()
 avg_marriage_female = df_view['rate_female'].mean()
 avg_marriage_male = df_view['rate_male'].mean()
 
-# Pendapatan Isi Rumah (ambil tahun terkini yang ada data kerana survei HIES tidak dibuat setiap tahun)
+# Household Income (automatically selects the latest available survey year)
 df_inc_valid = df_view.dropna(subset=['income_mean'])
 latest_inc_year = int(df_inc_valid['year'].max()) if not df_inc_valid.empty else 2024
 df_latest_inc = df_view[df_view['year'] == latest_inc_year]
 latest_income_mean = df_latest_inc['income_mean'].mean()
 latest_income_median = df_latest_inc['income_median'].mean()
 
-# CPI
+# Consumer Price Index (CPI)
 latest_cpi = df_2024['index'].mean()
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     st.metric(
-        label="Kadar Kahwin Wanita (2024)",
+        label="Female Marriage Rate (2024)",
         value=f"{latest_marriage_female:.2f}" if pd.notna(latest_marriage_female) else "N/A",
-        delta=f"Purata: {avg_marriage_female:.2f}" if pd.notna(avg_marriage_female) else None,
+        delta=f"Avg: {avg_marriage_female:.2f}" if pd.notna(avg_marriage_female) else None,
         delta_color="off"
     )
 
 with col2:
     st.metric(
-        label="Kadar Kahwin Lelaki (2024)",
+        label="Male Marriage Rate (2024)",
         value=f"{latest_marriage_male:.2f}" if pd.notna(latest_marriage_male) else "N/A",
-        delta=f"Purata: {avg_marriage_male:.2f}" if pd.notna(avg_marriage_male) else None,
+        delta=f"Avg: {avg_marriage_male:.2f}" if pd.notna(avg_marriage_male) else None,
         delta_color="off"
     )
 
 with col3:
     st.metric(
-        label=f"Purata Pendapatan ({latest_inc_year})",
+        label=f"Mean Household Income ({latest_inc_year})",
         value=f"RM {latest_income_mean:,.2f}" if pd.notna(latest_income_mean) else "N/A"
     )
 
 with col4:
     st.metric(
-        label=f"Pendapatan Median ({latest_inc_year})",
+        label=f"Median Household Income ({latest_inc_year})",
         value=f"RM {latest_income_median:,.2f}" if pd.notna(latest_income_median) else "N/A"
     )
 
 with col5:
     st.metric(
-        label="Indeks CPI (2024)",
+        label="CPI Index (2024)",
         value=f"{latest_cpi:.2f}" if pd.notna(latest_cpi) else "N/A"
     )
 
-# Paparan jadual data (ganti display() dari Colab)
-with st.expander("Lihat Jadual Data Gabungan"):
+# Interactive dataframe viewer (replaces Colab's display())
+with st.expander("View Merged Dataset"):
     st.dataframe(df_view, use_container_width=True)
 
 st.divider()
 
-# --- BAHAGIAN 2: VISUALISASI ---
+# --- SECTION 2: VISUALIZATIONS ---
 sns.set_theme(style="whitegrid")
 
 annual_summary = df_view.groupby('year').agg({
@@ -163,30 +163,30 @@ annual_summary = df_view.groupby('year').agg({
 }).reset_index()
 
 tab1, tab2, tab3 = st.tabs([
-    "📈 Trend Tahunan (Garis)",
-    "📊 Perbandingan Jantina (Bar)",
-    "🗺️ Pecahan Mengikut Negeri (Heatmap)"
+    "📈 Annual Trends (Line)",
+    "📊 Gender Comparison (Bar)",
+    "🗺️ State Breakdown (Heatmap)"
 ])
 
-# Visualisasi 1: Line Plots
+# Visualization 1: Line Plots
 with tab1:
-    st.subheader("Trend Kadar Perkahwinan, Pendapatan & CPI (2018–2024)")
+    st.subheader("Marriage Rates, Household Income & CPI Trends (2018–2024)")
     fig1, axes = plt.subplots(3, 1, figsize=(10, 14), sharex=True)
 
-    sns.lineplot(data=annual_summary, x='year', y='rate_female', ax=axes[0], marker='o', label='Female (Perempuan)', color='purple', linewidth=2.5)
-    sns.lineplot(data=annual_summary, x='year', y='rate_male', ax=axes[0], marker='s', label='Male (Lelaki)', color='teal', linewidth=2.5)
-    axes[0].set_title('Average Marriage Rates Trend (2018-2024)', fontsize=12, fontweight='bold')
+    sns.lineplot(data=annual_summary, x='year', y='rate_female', ax=axes[0], marker='o', label='Female', color='purple', linewidth=2.5)
+    sns.lineplot(data=annual_summary, x='year', y='rate_male', ax=axes[0], marker='s', label='Male', color='teal', linewidth=2.5)
+    axes[0].set_title('Average Marriage Rates Trend (2018–2024)', fontsize=12, fontweight='bold')
     axes[0].set_ylabel('Rate (Per 1,000 population)', fontsize=10)
-    axes[0].legend(title='Sex (Jantina)')
+    axes[0].legend(title='Sex')
 
     sns.lineplot(data=annual_summary, x='year', y='income_mean', ax=axes[1], marker='o', label='Mean Income', color='forestgreen', linewidth=2.5)
     sns.lineplot(data=annual_summary, x='year', y='income_median', ax=axes[1], marker='^', label='Median Income', color='darkorange', linewidth=2.5)
-    axes[1].set_title('Average Monthly Household Income Trend (2018-2024)', fontsize=12, fontweight='bold')
+    axes[1].set_title('Average Monthly Household Income Trend (2018–2024)', fontsize=12, fontweight='bold')
     axes[1].set_ylabel('Income (RM)', fontsize=10)
     axes[1].legend(title='Metric')
 
     sns.lineplot(data=annual_summary, x='year', y='index', ax=axes[2], marker='o', color='crimson', linewidth=2.5, label='CPI Index')
-    axes[2].set_title('Average Consumer Price Index (CPI) Trend (2018-2024)', fontsize=12, fontweight='bold')
+    axes[2].set_title('Average Consumer Price Index (CPI) Trend (2018–2024)', fontsize=12, fontweight='bold')
     axes[2].set_ylabel('CPI Index', fontsize=10)
     axes[2].set_xlabel('Year', fontsize=10)
 
@@ -195,9 +195,9 @@ with tab1:
     st.pyplot(fig1)
     plt.close(fig1)
 
-# Visualisasi 2: Grouped Bar Chart
+# Visualization 2: Grouped Bar Chart
 with tab2:
-    st.subheader("Purata Kadar Perkahwinan Mengikut Tahun & Jantina")
+    st.subheader("Average Marriage Rates by Year and Sex")
     df_bar_data = annual_summary.melt(
         id_vars=['year'],
         value_vars=['rate_female', 'rate_male'],
@@ -205,8 +205,8 @@ with tab2:
         value_name='Marriage Rate'
     )
     df_bar_data['Sex'] = df_bar_data['Sex'].map({
-        'rate_female': 'Female (Perempuan)',
-        'rate_male': 'Male (Lelaki)'
+        'rate_female': 'Female',
+        'rate_male': 'Male'
     })
 
     fig2, ax2 = plt.subplots(figsize=(10, 6))
@@ -221,16 +221,16 @@ with tab2:
     ax2.set_title('Average Marriage Rates by Year (2018–2024)', fontsize=14, fontweight='bold')
     ax2.set_xlabel('Year', fontsize=12)
     ax2.set_ylabel('Average Marriage Rate (per 1,000 population)', fontsize=12)
-    ax2.legend(title='Sex (Jantina)', loc='upper right')
+    ax2.legend(title='Sex', loc='upper right')
     ax2.grid(axis='y', linestyle='--', alpha=0.7)
 
     plt.tight_layout()
     st.pyplot(fig2)
     plt.close(fig2)
 
-# Visualisasi 3: Heatmap
+# Visualization 3: Heatmap
 with tab3:
-    st.subheader("Pecahan Kadar Perkahwinan Wanita Mengikut Negeri")
+    st.subheader("Female Marriage Rates Breakdown by State")
     df_heatmap_data = df_view.dropna(subset=['state']).pivot_table(
         index='state',
         columns='year',
@@ -256,4 +256,4 @@ with tab3:
         st.pyplot(fig3)
         plt.close(fig3)
     else:
-        st.warning("Tiada data mencukupi untuk memaparkan heatmap.")
+        st.warning("Not enough data available to display the heatmap.")
