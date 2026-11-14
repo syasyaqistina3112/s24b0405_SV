@@ -14,6 +14,7 @@ st.title("📊 Malaysia Household Income Growth vs. CPI Inflation (2018–2024)"
 st.markdown(
     "Analysis of state-level household income growth against Consumer Price Index (CPI) inflation "
     "using data from the Department of Statistics Malaysia (DOSM)."
+ st.info("Objective 2: To compare household income growth against consumer prices to identify periods where price increases outpace income.")   
 )
 
 # 2. Load Data with Caching (Prevents re-downloading on every interaction)
