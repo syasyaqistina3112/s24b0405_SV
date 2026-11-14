@@ -17,7 +17,6 @@ st.title("📊 Impact of Cost of Living & Income on Marriage Rates in Malaysia (
 st.markdown(
     "Analyzing state-level Consumer Price Index (CPI), household income, and marriage rate trends "
     "using open data from the **Department of Statistics Malaysia (DOSM)**."
- st.info("Objective 3: To evaluate the impact of rising consumer prices (cost of living) on marriage decisions.")   
 )
 
 # ---------------------------------------------------------
